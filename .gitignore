@@ -1,0 +1,20 @@
+```
+# Compiled and build artifacts
+*.class
+target/
+
+# Dependencies
+.m2/
+.gradle/
+
+# Logs and temp files
+*.log
+*.tmp
+
+# Editors
+.vscode/
+.idea/
+
+# Test reports
+**/surefire-reports/
+```
