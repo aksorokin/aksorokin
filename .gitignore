@@ -1,20 +1,47 @@
 ```
-# Compiled and build artifacts
-*.class
+# Java/Maven specific
 target/
+*.class
+*.jar
+*.war
+*.ear
+*.zip
+*.tar.gz
 
 # Dependencies
 .m2/
 .gradle/
+node_modules/
 
-# Logs and temp files
-*.log
-*.tmp
-
-# Editors
-.vscode/
+# IDE
 .idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.settings/
+.project
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Environment
+.env
+.env.local
+*.env.*
 
 # Test reports
-**/surefire-reports/
+test-results/
+surefire-reports/
+
+# Database migration backups (if any auto-generated)
+db/migration/*_backup*
+
+# Compiled resources
+**/generated-sources/
+**/generated-test-sources/
 ```

@@ -3,7 +3,10 @@ package com.shiftcalc.calculator;
 import com.shiftcalc.model.Shift;
 import com.shiftcalc.model.ShiftCalculationResult;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import java.math.BigDecimal;
 import java.time.ZoneId;
@@ -11,9 +14,7 @@ import java.time.ZonedDateTime;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/**
- * Тесты для калькулятора показателей смен.
- */
+@DisplayName("Тесты калькулятора показателей смен")
 class ShiftMetricsCalculatorTest {
 
     private ShiftMetricsCalculator calculator;
@@ -24,13 +25,20 @@ class ShiftMetricsCalculatorTest {
     }
 
     @Test
+    @DisplayName("Расчёт базовых показателей смены")
     void testCalculateBasicMetrics() {
-        // Смена: 8 часов, 10 сотрудников, ставка 100 руб/час
         ZonedDateTime start = ZonedDateTime.of(2024, 1, 15, 9, 0, 0, 0, ZoneId.of("Europe/Moscow"));
         ZonedDateTime end = ZonedDateTime.of(2024, 1, 15, 17, 0, 0, 0, ZoneId.of("Europe/Moscow"));
-        
-        Shift shift = new Shift(1L, "Test Shift", "Europe/Moscow", start, end, 
-                new BigDecimal("100.00"), 10);
+
+        Shift shift = Shift.builder()
+                .id(1L)
+                .shiftName("Test Shift")
+                .timeZoneId("Europe/Moscow")
+                .startTime(start)
+                .endTime(end)
+                .baseRate(new BigDecimal("100.00"))
+                .employeeCount(10)
+                .build();
 
         ShiftCalculationResult result = calculator.calculate(shift);
 
@@ -39,74 +47,136 @@ class ShiftMetricsCalculatorTest {
         assertEquals(new BigDecimal("8000.00"), result.getTotalLaborCost());
         assertEquals(new BigDecimal("100.00"), result.getAverageHourlyRate());
         assertEquals(10, result.getEmployeeCount());
+        assertEquals(0, result.getNightHours());
+        assertEquals(8, result.getDayHours());
     }
 
     @Test
+    @DisplayName("Расчёт с ночными часами - полностью ночная смена")
     void testCalculateWithNightHours() {
-        // Ночная смена: 22:00 - 06:00 (8 часов, все ночные)
         ZonedDateTime start = ZonedDateTime.of(2024, 1, 15, 22, 0, 0, 0, ZoneId.of("Europe/Moscow"));
         ZonedDateTime end = ZonedDateTime.of(2024, 1, 16, 6, 0, 0, 0, ZoneId.of("Europe/Moscow"));
-        
-        Shift shift = new Shift(2L, "Night Shift", "Europe/Moscow", start, end,
-                new BigDecimal("100.00"), 5);
+
+        Shift shift = Shift.builder()
+                .id(2L)
+                .shiftName("Night Shift")
+                .timeZoneId("Europe/Moscow")
+                .startTime(start)
+                .endTime(end)
+                .baseRate(new BigDecimal("100.00"))
+                .employeeCount(5)
+                .build();
 
         BigDecimal nightMultiplier = new BigDecimal("1.5");
         ShiftCalculationResult result = calculator.calculateWithNightHours(shift, nightMultiplier);
 
-        // 8 ночных часов * 1.5 * 100 * 5 сотрудников = 6000
         assertEquals(new BigDecimal("6000.00"), result.getTotalLaborCost());
+        assertEquals(8, result.getNightHours());
     }
 
     @Test
+    @DisplayName("Расчёт смешанной дневной/ночной смены")
     void testCalculateMixedDayNightShift() {
-        // Смешанная смена: 14:00 - 23:00 (9 часов, 1 ночной час - 22:00)
         ZonedDateTime start = ZonedDateTime.of(2024, 1, 15, 14, 0, 0, 0, ZoneId.of("Europe/Moscow"));
         ZonedDateTime end = ZonedDateTime.of(2024, 1, 15, 23, 0, 0, 0, ZoneId.of("Europe/Moscow"));
-        
-        Shift shift = new Shift(3L, "Evening Shift", "Europe/Moscow", start, end,
-                new BigDecimal("100.00"), 1);
+
+        Shift shift = Shift.builder()
+                .id(3L)
+                .shiftName("Evening Shift")
+                .timeZoneId("Europe/Moscow")
+                .startTime(start)
+                .endTime(end)
+                .baseRate(new BigDecimal("100.00"))
+                .employeeCount(1)
+                .build();
 
         BigDecimal nightMultiplier = new BigDecimal("1.5");
         ShiftCalculationResult result = calculator.calculateWithNightHours(shift, nightMultiplier);
 
-        // 8 дневных часов + 1 ночной * 1.5 = 8 + 1.5 = 9.5 * 100 = 950
         assertEquals(new BigDecimal("950.00"), result.getTotalLaborCost());
+        assertEquals(1, result.getNightHours());
+        assertEquals(8, result.getDayHours());
     }
 
     @Test
+    @DisplayName("Конвертация в другой часовой пояс")
     void testConvertToTimeZone() {
         ZonedDateTime start = ZonedDateTime.of(2024, 1, 15, 12, 0, 0, 0, ZoneId.of("Europe/Moscow"));
         ZonedDateTime end = ZonedDateTime.of(2024, 1, 15, 20, 0, 0, 0, ZoneId.of("Europe/Moscow"));
-        
-        Shift shift = new Shift(4L, "Moscow Shift", "Europe/Moscow", start, end,
-                new BigDecimal("100.00"), 1);
+
+        Shift shift = Shift.builder()
+                .id(4L)
+                .shiftName("Moscow Shift")
+                .timeZoneId("Europe/Moscow")
+                .startTime(start)
+                .endTime(end)
+                .baseRate(new BigDecimal("100.00"))
+                .employeeCount(1)
+                .build();
 
         Shift utcShift = calculator.convertToTimeZone(shift, "UTC");
 
         assertEquals("UTC", utcShift.getTimeZoneId());
-        // Москва UTC+3, значит 12:00 Moscow = 09:00 UTC
         assertEquals(9, utcShift.getStartTime().getHour());
         assertEquals(17, utcShift.getEndTime().getHour());
     }
 
     @Test
+    @DisplayName("Одинаковая длительность в разных часовых поясах")
     void testDifferentTimeZones() {
-        // Одинаковое абсолютное время в разных часовых поясах
         ZonedDateTime moscowStart = ZonedDateTime.of(2024, 1, 15, 12, 0, 0, 0, ZoneId.of("Europe/Moscow"));
         ZonedDateTime nyStart = moscowStart.withZoneSameInstant(ZoneId.of("America/New_York"));
-        
-        Shift moscowShift = new Shift(5L, "Moscow", "Europe/Moscow", moscowStart,
-                moscowStart.plusHours(8), new BigDecimal("100.00"), 1);
-        
-        Shift nyShift = new Shift(6L, "NewYork", "America/New_York", nyStart,
-                nyStart.plusHours(8), new BigDecimal("100.00"), 1);
+
+        Shift moscowShift = Shift.builder()
+                .id(5L)
+                .shiftName("Moscow")
+                .timeZoneId("Europe/Moscow")
+                .startTime(moscowStart)
+                .endTime(moscowStart.plusHours(8))
+                .baseRate(new BigDecimal("100.00"))
+                .employeeCount(1)
+                .build();
+
+        Shift nyShift = Shift.builder()
+                .id(6L)
+                .shiftName("NewYork")
+                .timeZoneId("America/New_York")
+                .startTime(nyStart)
+                .endTime(nyStart.plusHours(8))
+                .baseRate(new BigDecimal("100.00"))
+                .employeeCount(1)
+                .build();
 
         ShiftCalculationResult moscowResult = calculator.calculate(moscowShift);
         ShiftCalculationResult nyResult = calculator.calculate(nyShift);
 
-        // Продолжительность должна быть одинаковой
         assertEquals(moscowResult.getDurationHours(), nyResult.getDurationHours());
-        // Стоимость должна быть одинаковой (одинаковая длительность и ставка)
         assertEquals(moscowResult.getTotalLaborCost(), nyResult.getTotalLaborCost());
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "2024, 1, 15, 22, 2024, 1, 16, 6, 8",
+        "2024, 1, 15, 23, 2024, 1, 16, 7, 8"
+    })
+    @DisplayName("Параметризованный тест ночных часов")
+    void testNightHoursCalculation(int startYear, int startMonth, int startDay, int startHour,
+                                    int endYear, int endMonth, int endDay, int endHour,
+                                    long expectedNightHours) {
+        ZonedDateTime start = ZonedDateTime.of(startYear, startMonth, startDay, startHour, 0, 0, 0, ZoneId.of("Europe/Moscow"));
+        ZonedDateTime end = ZonedDateTime.of(endYear, endMonth, endDay, endHour, 0, 0, 0, ZoneId.of("Europe/Moscow"));
+
+        Shift shift = Shift.builder()
+                .id(1L)
+                .shiftName("Parametrized Test")
+                .timeZoneId("Europe/Moscow")
+                .startTime(start)
+                .endTime(end)
+                .baseRate(BigDecimal.valueOf(100))
+                .employeeCount(1)
+                .build();
+
+        ShiftCalculationResult result = calculator.calculateWithNightHours(shift, BigDecimal.valueOf(1.5));
+        assertEquals(expectedNightHours, result.getNightHours());
     }
 }
